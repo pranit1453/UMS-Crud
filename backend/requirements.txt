@@ -1,0 +1,6 @@
+Flask==3.1.2 # Web framework
+Flask-SQLAlchemy==3.1.1 # ORM integration
+Flask-Migrate==4.1.0 # Database migrations
+Flask-CORS==5.0.0 # CORS support
+psycopg[binary]==3.2.10 # PostgreSQL driver
+python-dotenv==1.1.1 # Environment variables

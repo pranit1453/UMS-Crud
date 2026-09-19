@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management System | CRUD Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eep2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="min-h-screen flex flex-col bg-slate-900 text-slate-100">
+
+    <!-- Header / Navbar -->
+    <header class="glass-panel sticky top-0 z-30 border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-indigo-600/20 p-2.5 rounded-xl border border-indigo-500/30 text-indigo-400">
+                    <i class="fa-solid fa-users-gear text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400 bg-clip-text text-transparent">
+                        User Management System
+                    </h1>
+                    <p class="text-xs text-slate-400">REST API & CRUD Dashboard</p>
+                </div>
+            </div>
+            
+            <!-- Connection Status -->
+            <div class="flex items-center space-x-3">
+                <div id="connectionStatus" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700">
+                    <span class="w-2 h-2 rounded-full bg-yellow-400 mr-2 animate-pulse"></span>
+                    <span>Checking API...</span>
+                </div>
+                <button onclick="fetchUsers()" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors" title="Refresh Users">
+                    <i class="fa-solid fa-rotate text-sm"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+        <!-- Stats Overview Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="glass-card p-5 rounded-2xl">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Users</p>
+                        <h3 id="statTotalUsers" class="text-2xl font-bold mt-1 text-white">0</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center border border-indigo-500/20">
+                        <i class="fa-solid fa-user-group"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card p-5 rounded-2xl">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Database Driver</p>
+                        <h3 class="text-lg font-bold mt-1 text-emerald-400 flex items-center">
+                            <i class="fa-solid fa-database mr-2 text-xs"></i> PostgreSQL
+                        </h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+                        <i class="fa-solid fa-server"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card p-5 rounded-2xl">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">API Health Status</p>
+                        <h3 id="statApiHealth" class="text-lg font-bold mt-1 text-yellow-400">
+                            Checking...
+                        </h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center border border-purple-500/20">
+                        <i class="fa-solid fa-heart-pulse"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions Bar -->
+        <div class="glass-panel p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
+            <!-- Search Input -->
+            <div class="relative w-full md:w-80">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="Search by name or email..." 
+                    class="w-full bg-slate-900/80 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+                    oninput="handleSearch()"
+                >
+            </div>
+
+            <!-- Add User Button -->
+            <button 
+                onclick="openCreateModal()" 
+                class="w-full md:w-auto inline-flex items-center justify-center px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-all shadow-lg shadow-indigo-600/25 active:scale-95 space-x-2"
+            >
+                <i class="fa-solid fa-user-plus text-xs"></i>
+                <span>Add New User</span>
+            </button>
+        </div>
+
+        <!-- Table Container -->
+        <div class="glass-panel rounded-2xl overflow-hidden border border-slate-800 shadow-xl">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-800/80 border-b border-slate-700/60 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                            <th class="py-4 px-6">ID</th>
+                            <th class="py-4 px-6">User</th>
+                            <th class="py-4 px-6">Email</th>
+                            <th class="py-4 px-6">Phone</th>
+                            <th class="py-4 px-6">Created At</th>
+                            <th class="py-4 px-6 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userTableBody" class="divide-y divide-slate-800/60 text-sm">
+                        <!-- User Rows Rendered Dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="hidden p-12 text-center">
+                <div class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-500 text-2xl">
+                    <i class="fa-solid fa-users-slash"></i>
+                </div>
+                <h3 class="text-base font-semibold text-slate-300">No users found</h3>
+                <p class="text-xs text-slate-500 mt-1">Add a new user or try adjusting your search terms.</p>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div id="loadingState" class="p-12 text-center">
+                <i class="fa-solid fa-circle-notch fa-spin text-indigo-500 text-3xl"></i>
+                <p class="text-xs text-slate-400 mt-3 font-medium">Loading user data...</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 py-6 text-center text-xs text-slate-500">
+        User Management System &bull; Flask REST API & PostgreSQL Backend
+    </footer>
+
+    <!-- CREATE USER MODAL -->
+    <div id="createModal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-black/60 backdrop-blur-sm p-4">
+        <div class="glass-panel w-full max-w-md rounded-2xl border border-slate-700 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+                <h3 class="font-bold text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-user-plus text-indigo-400 text-sm"></i> Add New User
+                </h3>
+                <button onclick="closeCreateModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="createForm" onsubmit="handleCreateUser(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">First Name *</label>
+                    <input type="text" id="createFirstName" required placeholder="e.g. John" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Last Name *</label>
+                    <input type="text" id="createLastName" required placeholder="e.g. Doe" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Email Address *</label>
+                    <input type="email" id="createEmail" required placeholder="john.doe@example.com" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Phone Number</label>
+                    <input type="tel" id="createPhone" placeholder="+1 (555) 000-0000" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-slate-800">
+                    <button type="button" onclick="closeCreateModal()" class="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white rounded-xl">Cancel</button>
+                    <button type="submit" class="px-4 py-2 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-lg shadow-indigo-600/30">Create User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- EDIT USER MODAL -->
+    <div id="editModal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-black/60 backdrop-blur-sm p-4">
+        <div class="glass-panel w-full max-w-md rounded-2xl border border-slate-700 shadow-2xl overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+                <h3 class="font-bold text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-user-pen text-indigo-400 text-sm"></i> Edit User
+                </h3>
+                <button onclick="closeEditModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="editForm" onsubmit="handleUpdateUser(event)" class="p-6 space-y-4">
+                <input type="hidden" id="editUserId">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">First Name *</label>
+                    <input type="text" id="editFirstName" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Last Name *</label>
+                    <input type="text" id="editLastName" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Email Address *</label>
+                    <input type="email" id="editEmail" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Phone Number</label>
+                    <input type="tel" id="editPhone" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-slate-800">
+                    <button type="button" onclick="closeEditModal()" class="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white rounded-xl">Cancel</button>
+                    <button type="submit" class="px-4 py-2 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-lg shadow-indigo-600/30">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- VIEW USER MODAL -->
+    <div id="viewModal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-black/60 backdrop-blur-sm p-4">
+        <div class="glass-panel w-full max-w-md rounded-2xl border border-slate-700 shadow-2xl overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+                <h3 class="font-bold text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-address-card text-indigo-400 text-sm"></i> User Profile
+                </h3>
+                <button onclick="closeViewModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-6">
+                <!-- Avatar & Name Header -->
+                <div class="flex items-center space-x-4">
+                    <div id="viewAvatar" class="w-14 h-14 rounded-2xl bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 font-bold text-xl flex items-center justify-center shadow-inner">
+                        --
+                    </div>
+                    <div>
+                        <h4 id="viewFullName" class="text-lg font-bold text-white">Loading...</h4>
+                        <span id="viewUserIdBadge" class="inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-400">ID: --</span>
+                    </div>
+                </div>
+
+                <!-- Info Cards Grid -->
+                <div class="space-y-3 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                    <div>
+                        <span class="text-xs text-slate-500 block">Email Address</span>
+                        <p id="viewEmail" class="text-sm font-medium text-slate-200 mt-0.5">--</p>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-500 block">Phone</span>
+                        <p id="viewPhone" class="text-sm font-medium text-slate-200 mt-0.5">--</p>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-500 block">Created At</span>
+                        <p id="viewCreatedAt" class="text-xs font-mono text-slate-400 mt-0.5">--</p>
+                    </div>
+                    <div>
+                        <span class="text-xs text-slate-500 block">Last Updated</span>
+                        <p id="viewUpdatedAt" class="text-xs font-mono text-slate-400 mt-0.5">--</p>
+                    </div>
+                </div>
+
+                <div class="flex justify-end pt-2">
+                    <button onclick="closeViewModal()" class="px-4 py-2 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-white rounded-xl">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DELETE CONFIRMATION MODAL -->
+    <div id="deleteModal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-black/60 backdrop-blur-sm p-4">
+        <div class="glass-panel w-full max-w-sm rounded-2xl border border-red-500/30 shadow-2xl overflow-hidden p-6 text-center space-y-4">
+            <div class="w-12 h-12 bg-red-500/10 text-red-400 rounded-full flex items-center justify-center mx-auto border border-red-500/20">
+                <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-lg text-slate-100">Delete User?</h3>
+                <p class="text-xs text-slate-400 mt-1">Are you sure you want to delete <span id="deleteUserName" class="font-semibold text-slate-200">this user</span>? This action cannot be undone.</p>
+            </div>
+            <input type="hidden" id="deleteUserId">
+            <div class="flex justify-center gap-3 pt-2">
+                <button onclick="closeDeleteModal()" class="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white rounded-xl bg-slate-800">Cancel</button>
+                <button onclick="confirmDeleteUser()" class="px-4 py-2 text-xs font-medium bg-red-600 hover:bg-red-500 text-white rounded-xl shadow-lg shadow-red-600/30">Delete Permanently</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none max-w-sm w-full"></div>
+
+    <!-- App Script -->
+    <script src="app.js"></script>
+</body>
+</html>
