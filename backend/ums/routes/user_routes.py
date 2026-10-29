@@ -1,5 +1,9 @@
 from flask import Blueprint, request
+from sqlalchemy.sql.functions import current_user
+
 import ums.services.user_service as user_service
+from ums.decorators import role_required
+from flask_login import login_required as login_required_flask
 
 user_bp = Blueprint(
     "users",
@@ -7,7 +11,50 @@ user_bp = Blueprint(
     url_prefix="/api/users"
 )
 
+
+@user_bp.get("")
+@login_required_flask
+def get_users():
+    """Get all users - admin only"""
+    if current_user.role.name != "admin":
+        return {"error": "Insufficient permissions"}, 403
+    try:
+        users = user_service.get_all_users()
+        return {
+            "count": len(users),
+            "data": [user.to_dict() for user in users]
+        }, 200
+    except Exception as e:
+        return {
+            "error": f"Failed to fetch users: {str(e)}"
+        }, 500
+
+
+@user_bp.get("/<int:user_id>")
+@login_required_flask
+def get_user(user_id):
+    """Get user by ID - all authenticated users can view"""
+    try:
+        user = user_service.get_user(user_id)
+        if not user:
+            return {
+                "error": f"User with ID {user_id} not found"
+            }, 404
+        # Users can view their own profile, admins can view any
+        if user.id != current_user.id and current_user.role.name != "admin":
+            return {"error": "Insufficient permissions"}, 403
+        return {
+            "data": user.to_dict()
+        }, 200
+    except Exception as e:
+        return {
+            "error": f"Error fetching user: {str(e)}"
+        }, 500
+
+
 @user_bp.post("")
+@login_required_flask
+@role_required("admin")
 def create_user():
     data = request.get_json() or {}
     required_fields = ["firstName", "lastName", "email"]
@@ -33,36 +80,9 @@ def create_user():
             "error": f"An unexpected error occurred: {str(e)}"
         }, 500
 
-@user_bp.get("")
-def get_users():
-    try:
-        users = user_service.get_all_users()
-        return {
-            "count": len(users),
-            "data": [user.to_dict() for user in users]
-        }, 200
-    except Exception as e:
-        return {
-            "error": f"Failed to fetch users: {str(e)}"
-        }, 500
-
-@user_bp.get("/<int:user_id>")
-def get_user(user_id):
-    try:
-        user = user_service.get_user(user_id)
-        if not user:
-            return {
-                "error": f"User with ID {user_id} not found"
-            }, 404
-        return {
-            "data": user.to_dict()
-        }, 200
-    except Exception as e:
-        return {
-            "error": f"Error fetching user: {str(e)}"
-        }, 500
 
 @user_bp.put("/<int:user_id>")
+@login_required_flask
 def update_user(user_id):
     data = request.get_json() or {}
     try:
@@ -71,6 +91,8 @@ def update_user(user_id):
             return {
                 "error": f"User with ID {user_id} not found"
             }, 404
+        if user.id != current_user.id and current_user.role.name != "admin":
+            return {"error": "Insufficient permissions"}, 403
         return {
             "message": "User updated successfully",
             "data": user.to_dict()
@@ -84,7 +106,10 @@ def update_user(user_id):
             "error": f"Error updating user: {str(e)}"
         }, 500
 
+
 @user_bp.delete("/<int:user_id>")
+@login_required_flask
+@role_required("admin")
 def delete_user(user_id):
     try:
         deleted = user_service.delete_user(user_id)

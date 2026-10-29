@@ -1,7 +1,11 @@
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from ums.extensions import db
-from ums.models.user import User
+from ums.models.user import User, Role
+
+
+def get_user_by_email(email):
+    return db.session.scalar(select(User).where(User.email == email.strip().lower()))
 
 
 def create_user(data):

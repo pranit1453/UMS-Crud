@@ -3,10 +3,13 @@ const API_BASE_URL = (window.location.port === '8080' || window.location.port ==
     : 'http://localhost:5000';
 
 let allUsers = [];
+let isAuthenticated = false;
+let userRole = null;
 
 // Initialize Dashboard on DOM load
 document.addEventListener('DOMContentLoaded', () => {
     checkHealth();
+    checkAuth();
     fetchUsers();
     
     // Periodically check health every 15s
@@ -36,11 +39,130 @@ async function checkHealth() {
     }
 }
 
+// User data from authentication
+let currentUser = null;
+
+// Check Authentication status
+async function checkAuth() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+            credentials: 'include'
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            isAuthenticated = true;
+            userRole = result.role;
+            currentUser = result.user;  // Store user data from response
+            updateAuthUI();
+            fetchUsers();
+        } else {
+            isAuthenticated = false;
+            userRole = null;
+            currentUser = null;
+            showLoginModal();
+        }
+    } catch (error) {
+        console.error('Auth check failed:', error);
+        isAuthenticated = false;
+        userRole = null;
+        currentUser = null;
+        showLoginModal();
+    }
+}
+
+// Show/Hide UI based on authentication state
+function updateAuthUI() {
+    const authBtn = document.getElementById('authBtn');
+    const loginModal = document.getElementById('loginModal');
+    
+    if (isAuthenticated && currentUser) {
+        // Show user info instead of login button
+        const userName = `${currentUser.firstName} ${currentUser.lastName}`.split(' ').slice(0, 2).join(' ') || 'User';
+        authBtn.innerHTML = `
+            <span class="text-slate-300 text-sm font-medium">Welcome, ${userName}</span>
+            <i class="fa-solid fa-user text-xs ml-1"></i>
+        `;
+        authBtn.onclick = () => logout();
+        loginModal.classList.add('hidden');
+    } else {
+        authBtn.innerHTML = `
+            <i class="fa-solid fa-sign-in text-sm"></i>
+        `;
+        authBtn.onclick = () => showLoginModal();
+    }
+}
+
+// Show login modal
+function showLoginModal() {
+    document.getElementById('loginModal').classList.remove('hidden');
+}
+
+// Close login modal
+function closeLoginModal() {
+    document.getElementById('loginModal').classList.add('hidden');
+}
+
+// Handle login form submission
+async function handleLogin(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to login');
+        }
+
+        showToast('Logged in successfully!', 'success');
+        closeLoginModal();
+        updateAuthUI();
+        fetchUsers();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+// Handle logout
+async function logout() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to logout');
+        }
+
+        showToast('Logged out successfully', 'success');
+        isAuthenticated = false;
+        userRole = null;
+        updateAuthUI();
+        fetchUsers();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
 // Fetch All Users (GET /api/users)
 async function fetchUsers() {
     showLoading(true);
     try {
-        const response = await fetch(`${API_BASE_URL}/api/users`);
+        const response = await fetch(`${API_BASE_URL}/api/users`, {
+            credentials: 'include'
+        });
         const result = await response.json();
 
         if (!response.ok) {
@@ -82,6 +204,10 @@ function renderUsers(users) {
             day: 'numeric'
         });
 
+        // Check if user has permission to edit/delete
+        const canEdit = user.id === currentUser.id || userRole === 'admin';
+        const canDelete = userRole === 'admin';
+
         const row = document.createElement('tr');
         row.className = 'hover:bg-slate-800/40 transition-colors group';
         row.innerHTML = `
@@ -101,15 +227,22 @@ function renderUsers(users) {
             <td class="py-4 px-6 text-slate-400 text-xs">${formattedDate}</td>
             <td class="py-4 px-6 text-right">
                 <div class="flex items-center justify-end space-x-2">
+                    <!-- View button always visible -->
                     <button onclick="openViewModal(${user.id})" class="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors" title="View Details">
                         <i class="fa-solid fa-eye text-sm"></i>
                     </button>
-                    <button onclick="openEditModal(${user.id})" class="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors" title="Edit User">
-                        <i class="fa-solid fa-pen-to-square text-sm"></i>
-                    </button>
-                    <button onclick="openDeleteModal(${user.id}, '${escapeHtml(fullName).replace(/'/g, "\\'")}')" class="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors" title="Delete User">
-                        <i class="fa-solid fa-trash-can text-sm"></i>
-                    </button>
+                    <!-- Edit button: users can edit their own, admins can edit any -->
+                    ${user.id === currentUser.id || userRole === 'admin' ? `
+                        <button onclick="openEditModal(${user.id})" class="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors" title="Edit User">
+                            <i class="fa-solid fa-pen-to-square text-sm"></i>
+                        </button>
+                    ` : ''}
+                    <!-- Delete button: only admins -->
+                    ${userRole === 'admin' ? `
+                        <button onclick="openDeleteModal(${user.id}, '${escapeHtml(fullName).replace(/'/g, \"\\\\'\")}')" class="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors" title="Delete User">
+                            <i class="fa-solid fa-trash-can text-sm"></i>
+                        </button>
+                    ` : ''}
                 </div>
             </td>
         `;
@@ -144,6 +277,12 @@ async function handleCreateUser(e) {
         phone: document.getElementById('createPhone').value || null
     };
 
+    // Only admins can create users
+    if (!isAuthenticated || userRole !== 'admin') {
+        showToast('Only administrators can create users', 'error');
+        return;
+    }
+
     try {
         const response = await fetch(`${API_BASE_URL}/api/users`, {
             method: 'POST',
@@ -169,7 +308,9 @@ async function handleCreateUser(e) {
 // Open View User Details Modal (GET /api/users/<id>)
 async function openViewModal(userId) {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/users/${userId}`);
+        const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+            credentials: 'include'
+        });
         const result = await response.json();
 
         if (!response.ok) {
@@ -201,7 +342,9 @@ function closeViewModal() {
 // Open Edit User Modal (GET /api/users/<id>)
 async function openEditModal(userId) {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/users/${userId}`);
+        const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+            credentials: 'include'
+        });
         const result = await response.json();
 
         if (!response.ok) {
@@ -237,6 +380,9 @@ async function handleUpdateUser(e) {
         phone: document.getElementById('editPhone').value || null
     };
 
+    // Users can update their own profile, admins can update any
+    const isOwnProfile = userId == /* current user id */ null; // simplified
+    
     try {
         const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
             method: 'PUT',
@@ -275,7 +421,8 @@ async function confirmDeleteUser() {
 
     try {
         const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            credentials: 'include'
         });
 
         const result = await response.json();
@@ -290,16 +437,6 @@ async function confirmDeleteUser() {
     } catch (error) {
         showToast(error.message, 'error');
     }
-}
-
-// Open / Close Create Modal
-function openCreateModal() {
-    document.getElementById('createForm').reset();
-    document.getElementById('createModal').classList.remove('hidden');
-}
-
-function closeCreateModal() {
-    document.getElementById('createModal').classList.add('hidden');
 }
 
 // UI State Helpers
@@ -351,9 +488,9 @@ function showToast(message, type = 'info') {
 function escapeHtml(str) {
     if (!str) return '';
     return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
+        .replace(/&/g, '&')
+        .replace(/</g, '<')
+        .replace(/>/g, '>')
+        .replace(/"/g, '"')
         .replace(/'/g, '&#039;');
 }
